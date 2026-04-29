@@ -10,6 +10,7 @@
             <tr>
                 <th>Id</th>
                 <th>Number</th>
+                <th>Owner</th>
                 <th>CreatedAt</th>
                 <th>Due_date</th>
                 <th>Total_ht</th>
@@ -22,6 +23,14 @@
             <tr>
                 <td>{{ invoice.id }}</td>
                 <td>{{ invoice.number }}</td>
+                <td>
+                    {% if invoice.owner %}
+                        {% set ownerName = (invoice.owner.firstName is not empty or invoice.owner.lastName is not empty) ? (invoice.owner.firstName|default('') ~ ' ' ~ invoice.owner.lastName|default('')) : (invoice.owner.compagnyName ?: invoice.owner.email) %}
+                        {{ ownerName|trim }}
+                    {% else %}
+                        {{ '' }}
+                    {% endif %}
+                </td>
                 <td>{{ invoice.createdAt ? invoice.createdAt|date('Y-m-d H:i:s') : '' }}</td>
                 <td>{{ invoice.dueDate ? invoice.dueDate|date('Y-m-d H:i:s') : '' }}</td>
                 <td>{{ invoice.totalHt }}</td>
@@ -33,7 +42,7 @@
             </tr>
         {% else %}
             <tr>
-                <td colspan="7">no records found</td>
+                <td colspan="8">no records found</td>
             </tr>
         {% endfor %}
         </tbody>

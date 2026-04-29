@@ -16,6 +16,17 @@
                 <td>{{ invoice.number }}</td>
             </tr>
             <tr>
+                <th>Owner</th>
+                <td>
+                    {% if invoice.owner %}
+                        {% set ownerName = (invoice.owner.firstName is not empty or invoice.owner.lastName is not empty) ? (invoice.owner.firstName|default('') ~ ' ' ~ invoice.owner.lastName|default('')) : (invoice.owner.compagnyName ?: invoice.owner.email) %}
+                        {{ ownerName|trim }}
+                    {% else %}
+                        {{ '' }}
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
                 <th>CreatedAt</th>
                 <td>{{ invoice.createdAt ? invoice.createdAt|date('Y-m-d H:i:s') : '' }}</td>
             </tr>

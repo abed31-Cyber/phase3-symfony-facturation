@@ -3,6 +3,8 @@
 namespace App\Entity;
 
 use App\Repository\InvoiceRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: InvoiceRepository::class)]
@@ -36,15 +38,22 @@ class Invoice
     private ?float $total_ttc = null;
 
     #[ORM\ManyToOne(inversedBy: 'invoices')]
-    private ?Client $client = null; 
+    private ?Client $client = null;
+
+    /**
+     * @var Collection<int, InvoiceItem>
+     */
+    #[ORM\OneToMany(targetEntity: InvoiceItem::class, mappedBy: 'invoice')]
+    private Collection $invoiceItems; 
 
  public function __construct()
-         {
-             $this->createdAt = new \DateTimeImmutable();
-             $this->status = 'DRAFT'; // Par défaut en brouillon
-             // Échéance à +30 jours par défaut
-             $this->due_date = (new \DateTimeImmutable())->modify('+30 days');
-         }
+                              {
+                                  $this->createdAt = new \DateTimeImmutable();
+                                  $this->status = 'DRAFT'; // Par défaut en brouillon
+                                  // Échéance à +30 jours par défaut
+                                  $this->due_date = (new \DateTimeImmutable())->modify('+30 days');
+                                  $this->invoiceItems = new ArrayCollection();
+                              }
 
     public function getId(): ?int
     {
@@ -106,7 +115,12 @@ class Invoice
 
     public function getTotalHt(): ?float
     {
-        return $this->total_ht;
+        $total = 0.0;
+        foreach ($this->invoiceItems as $item) {
+            $total += $item->getSubTotalHt();
+        }
+
+        return $total;
     }
 
     public function setTotalHt(float $total_ht): static
@@ -118,7 +132,14 @@ class Invoice
 
     public function getTotalTtc(): ?float
     {
-        return $this->total_ttc;
+        $total = 0.0;
+        foreach ($this->invoiceItems as $item) {
+            $sub = $item->getSubTotalHt();
+            $tax = $sub * ($item->getTaxRate() / 100.0);
+            $total += $sub + $tax;
+        }
+
+        return $total;
     }
 
     public function setTotalTtc(float $total_ttc): static
@@ -136,6 +157,60 @@ class Invoice
     public function setClient(?Client $client): static
     {
         $this->client = $client;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, InvoiceItem>
+     */
+    public function getInvoiceItems(): Collection
+    {
+        return $this->invoiceItems;
+    }
+
+    // Backward-compatibility: some code/templates may access $invoice->items or call getItems()
+    public function getItems(): Collection
+    {
+        return $this->invoiceItems;
+    }
+
+    public function __get(string $name)
+    {
+        if ($name === 'items') {
+            return $this->invoiceItems;
+        }
+
+        return null;
+    }
+
+    public function __isset(string $name): bool
+    {
+        if ($name === 'items') {
+            return isset($this->invoiceItems) && !$this->invoiceItems->isEmpty();
+        }
+
+        return false;
+    }
+
+    public function addInvoiceItem(InvoiceItem $invoiceItem): static
+    {
+        if (!$this->invoiceItems->contains($invoiceItem)) {
+            $this->invoiceItems->add($invoiceItem);
+            $invoiceItem->setInvoice($this);
+        }
+
+        return $this;
+    }
+
+    public function removeInvoiceItem(InvoiceItem $invoiceItem): static
+    {
+        if ($this->invoiceItems->removeElement($invoiceItem)) {
+            // set the owning side to null (unless already changed)
+            if ($invoiceItem->getInvoice() === $this) {
+                $invoiceItem->setInvoice(null);
+            }
+        }
 
         return $this;
     }
