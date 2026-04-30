@@ -11,6 +11,11 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\HasLifecycleCallbacks]
 class Invoice
 {
+    const DRAFT = 'DRAFT';
+    const PENDING = 'PENDING';
+    const PAID = 'PAID';
+    const CANCELLED = 'CANCELLED';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -60,13 +65,33 @@ class Invoice
         return $this->id;
     }
 
+    public function getStatus(): ?string
+    {
+        return $this->status;
+    }
+
+    public function setStatus(string $status): static
+    {
+        $this->status = $status;
+
+        return $this;
+    }
+
     public function getNumber(): ?string
     {
         return $this->number;
     }
 
-    #[ORM\PrePersist] // Se déclenche juste avant le premier INSERT en BDD
-   public function setNumber(): void
+    #[ORM\PrePersist]
+    #[ORM\PreUpdate]
+    public function computeTotals(): void
+    {
+        $this->total_ht = $this->getTotalHt();
+        $this->total_ttc = $this->getTotalTtc();
+    }
+
+    #[ORM\PrePersist]
+    public function setNumber(): void
     {
         if ($this->number === null) {
             // Logique simple : FAC-Année-Timestamp (ou un random)

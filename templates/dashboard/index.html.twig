@@ -1,0 +1,98 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Dashboard</h1>
+</div>
+
+{# Stats #}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon green">€</div>
+        <div class="stat-label">Chiffre d'affaires (Payé)</div>
+        <div class="stat-value">{{ totalPaid|number_format(0, ',', ' ') }} €</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange">📄</div>
+        <div class="stat-label">Factures en attente de paiement</div>
+        <div class="stat-value">{{ pendingCount }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon blue">👥</div>
+        <div class="stat-label">Total Clients</div>
+        <div class="stat-value">{{ clientCount }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon purple">📦</div>
+        <div class="stat-label">Total Produits</div>
+        <div class="stat-value">{{ productCount }}</div>
+    </div>
+</div>
+
+{# Chart #}
+<div class="chart-card">
+    <div class="chart-card-header">
+        <span class="chart-card-title">Chiffre d'affaires mensuel (Factures payées)</span>
+        <span class="text-muted" style="font-size:13px;">{{ "now"|date("Y") }}</span>
+    </div>
+    <canvas id="revenueChart" height="80"></canvas>
+</div>
+
+{# Quick actions #}
+<div class="quick-actions">
+    <a href="{{ path('app_invoice_new') }}" class="quick-action-card">
+        <div class="quick-action-text">
+            <div class="quick-action-title">Créer une facture</div>
+            <div class="quick-action-desc">Nouvelle prestation</div>
+        </div>
+        <span class="quick-action-arrow">→</span>
+    </a>
+    <a href="{{ path('app_client_index') }}" class="quick-action-card">
+        <div class="quick-action-text">
+            <div class="quick-action-title" style="color:#111827;">Ajouter un client</div>
+            <div class="quick-action-desc">Gérer le répertoire</div>
+        </div>
+        <span class="quick-action-arrow" style="color:#9CA3AF;">→</span>
+    </a>
+    <a href="{{ path('app_product_index') }}" class="quick-action-card">
+        <div class="quick-action-text">
+            <div class="quick-action-title" style="color:#111827;">Créer un produit / service</div>
+            <div class="quick-action-desc">Enrichir le catalogue</div>
+        </div>
+        <span class="quick-action-arrow" style="color:#9CA3AF;">→</span>
+    </a>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+const ctx = document.getElementById('revenueChart');
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'],
+        datasets: [{
+            data: {{ monthlyData|json_encode|raw }},
+            backgroundColor: '#2563EB',
+            borderRadius: 6,
+            borderSkipped: false,
+        }]
+    },
+    options: {
+        plugins: { legend: { display: false } },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { callback: v => v + '€', font: { size: 12 } },
+                grid: { color: '#F3F4F6' }
+            },
+            x: { grid: { display: false }, ticks: { font: { size: 12 } } }
+        }
+    }
+});
+</script>
+{% endblock %}

@@ -51,6 +51,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 34, nullable: true)]
     private ?string $iban = null;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $cgv = null;
+
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -200,6 +203,9 @@ public function setIban(?string $iban): static
 
     return $this;
 }
+
+public function getCgv(): ?string { return $this->cgv; }
+public function setCgv(?string $cgv): static { $this->cgv = $cgv; return $this; }
 
 public function getCreatedAt(): ?\DateTimeImmutable
 {

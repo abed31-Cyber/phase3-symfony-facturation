@@ -16,12 +16,25 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_USER')] // Seuls les utilisateurs connectés peuvent accéder à ces routes
 final class ClientController extends AbstractController
 {
-    #[Route(name: 'app_client_index', methods: ['GET'])]
-    public function index(ClientRepository $clientRepository): Response
+    #[Route(name: 'app_client_index', methods: ['GET', 'POST'])]
+    public function index(Request $request, ClientRepository $clientRepository, EntityManagerInterface $entityManager): Response
     {
+        $client = new Client();
+        $form = $this->createForm(ClientType::class, $client);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $client->setOwner($this->getUser());
+            $entityManager->persist($client);
+            $entityManager->flush();
+            $this->addFlash('success', 'Client ajouté avec succès.');
+            return $this->redirectToRoute('app_client_index', [], Response::HTTP_SEE_OTHER);
+        }
+
         return $this->render('client/index.html.twig', [
-            // On ne récupère que les clients de l'utilisateur actuel
-            'clients' => $clientRepository->findBy(['owner' => $this->getUser()]),
+            'clients'    => $clientRepository->findBy(['owner' => $this->getUser()]),
+            'form'       => $form->createView(),
+            'show_modal' => $form->isSubmitted() && !$form->isValid(),
         ]);
     }
 
