@@ -23,7 +23,7 @@ class InvoiceItem
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 0)]
     private ?string $unitPrice = null;
 
-    #[ORM\Column(type: Types::DECIMAL, precision: 20, scale: 0)]
+    #[ORM\Column(type: Types::DECIMAL, precision: 20, scale: 2)]
     private ?string $taxTva = null;
 
     #[ORM\ManyToOne(inversedBy: 'invoiceItems')]

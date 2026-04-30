@@ -1,11 +1,176 @@
-{% extends 'base.html.twig' %}
+{% extends 'layout.html.twig' %}
+{% block title %}Créer une facture{% endblock %}
 
-{% block title %}New Invoice{% endblock %}
+{% block content %}
+<a href="{{ path('app_invoice_index') }}" class="page-back">← Retour aux factures</a>
+<div class="page-header">
+    <h1 class="page-title">Créer une facture</h1>
+</div>
 
-{% block body %}
-    <h1>Create new Invoice</h1>
+{{ form_start(form) }}
 
-    {{ include('invoice/_form.html.twig') }}
+{# ===== Informations générales ===== #}
+<div class="card mb-4">
+    <h2 class="card-title">Informations Générales</h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label class="form-label">Client</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+                {{ form_widget(form.client, {attr: {class: 'form-select'}}) }}
+                <a href="{{ path('app_client_index') }}" class="btn btn-secondary" style="white-space:nowrap;">+</a>
+            </div>
+            {{ form_errors(form.client) }}
+        </div>
+        <div class="form-group">
+            <label class="form-label">Date de la facture</label>
+            {{ form_widget(form.dueDate, {attr: {class: 'form-control'}}) }}
+        </div>
+    </div>
+</div>
 
-    <a href="{{ path('app_invoice_index') }}">back to list</a>
+{# ===== Lignes de la facture ===== #}
+<div class="card mb-4">
+    <h2 class="card-title">Lignes de la facture</h2>
+
+    <table class="invoice-lines-table">
+        <thead>
+            <tr>
+                <th style="width:45%;">Produit / Service</th>
+                <th style="width:10%;">Qté</th>
+                <th style="width:15%;">Prix Unitaire</th>
+                <th style="width:15%;">Total</th>
+                <th style="width:5%;text-align:center;">—</th>
+            </tr>
+        </thead>
+        <tbody id="invoice-items-body"
+               data-prototype="{{ form_widget(form.invoiceItems.vars.prototype)|e('html_attr') }}">
+            {% for item in form.invoiceItems %}
+            <tr class="invoice-item-row">
+                <td>{{ form_widget(item.description, {attr: {class: 'form-control item-desc', placeholder: 'Description'}}) }}</td>
+                <td>{{ form_widget(item.quantity, {attr: {class: 'form-control item-qty'}}) }}</td>
+                <td>{{ form_widget(item.unitPrice, {attr: {class: 'form-control item-price'}}) }}</td>
+                <td class="fw-semibold item-total" style="white-space:nowrap;">—</td>
+                <td style="text-align:center;">
+                    <button type="button" class="btn-icon delete remove-row">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                        </svg>
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {# ===== Add row ===== #}
+    <div class="invoice-add-row">
+        <div class="form-group" style="flex:2;">
+            <label class="form-label">Sélectionner un produit</label>
+            <input type="text" id="product-search" class="form-control" placeholder="" list="product-list" autocomplete="off">
+            <datalist id="product-list"></datalist>
+        </div>
+        <div class="form-group" style="flex:0 0 100px;">
+            <label class="form-label">Quantité</label>
+            <input type="number" id="new-qty" class="form-control" value="1" min="1">
+        </div>
+        <div class="form-group" style="flex:0 0 120px;">
+            <label class="form-label">Prix unitaire (€)</label>
+            <input type="number" id="new-price" class="form-control" step="0.01" placeholder="">
+        </div>
+        <button type="button" class="btn btn-secondary" id="add-row-btn" style="margin-bottom:0;">+ Ajouter</button>
+    </div>
+
+    <div class="invoice-total">
+        <span>Total Facture (TTC) :</span>
+        <span id="grand-total" class="invoice-total-value">0.00 €</span>
+    </div>
+</div>
+
+{# ===== Actions ===== #}
+<div class="invoice-form-actions">
+    <a href="{{ path('app_invoice_index') }}" class="btn btn-secondary">Annuler</a>
+    <button type="submit" name="action_draft" class="btn btn-draft">Enregistrer en brouillon</button>
+    <button type="submit" name="action_validate" class="btn btn-primary">Enregistrer et valider</button>
+</div>
+
+{{ form_end(form) }}
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const tbody    = document.getElementById('invoice-items-body');
+    const addBtn   = document.getElementById('add-row-btn');
+    const totalEl  = document.getElementById('grand-total');
+    const prototype = tbody.dataset.prototype;
+    let idx = tbody.querySelectorAll('.invoice-item-row').length;
+
+    const fmt = n => parseFloat(n || 0).toFixed(2) + ' €';
+
+    const recalc = () => {
+        let total = 0;
+        tbody.querySelectorAll('.invoice-item-row').forEach(row => {
+            const qty   = parseFloat(row.querySelector('.item-qty')?.value) || 0;
+            const price = parseFloat(row.querySelector('.item-price')?.value) || 0;
+            const sub   = qty * price;
+            total += sub;
+            const el = row.querySelector('.item-total');
+            if (el) el.textContent = fmt(sub);
+        });
+        totalEl.textContent = fmt(total);
+    };
+
+    const addRow = (desc, qty, price) => {
+        const html = prototype.replace(/__name__/g, idx++);
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(`<table><tbody><tr>${html}</tr></tbody></table>`, 'text/html');
+
+        const tr = document.createElement('tr');
+        tr.className = 'invoice-item-row';
+        tr.innerHTML = `
+            <td><input class="form-control item-desc" name="${getInputName(html, 'description')}" value="${desc}" placeholder="Description"></td>
+            <td><input class="form-control item-qty" type="number" name="${getInputName(html, 'quantity')}" value="${qty}" min="0.01" step="0.01"></td>
+            <td><input class="form-control item-price" type="number" name="${getInputName(html, 'unitPrice')}" value="${price}" step="0.01"></td>
+            <td class="fw-semibold item-total" style="white-space:nowrap;">${fmt(qty * price)}</td>
+            <td style="text-align:center;">
+                <button type="button" class="btn-icon delete remove-row">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                    </svg>
+                </button>
+            </td>`;
+
+        tbody.appendChild(tr);
+        recalc();
+    };
+
+    // Extract input name from prototype html
+    const getInputName = (html, field) => {
+        const m = html.match(new RegExp(`name="([^"]*_${field})"`, 'i'));
+        return m ? m[1] : '';
+    };
+
+    addBtn.addEventListener('click', () => {
+        const desc  = document.getElementById('product-search').value;
+        const qty   = parseFloat(document.getElementById('new-qty').value) || 1;
+        const price = parseFloat(document.getElementById('new-price').value) || 0;
+        if (!desc) return;
+        addRow(desc, qty, price);
+        document.getElementById('product-search').value = '';
+        document.getElementById('new-qty').value = '1';
+        document.getElementById('new-price').value = '';
+    });
+
+    tbody.addEventListener('input', recalc);
+    tbody.addEventListener('click', e => {
+        if (e.target.closest('.remove-row')) {
+            e.target.closest('.invoice-item-row').remove();
+            recalc();
+        }
+    });
+
+    recalc();
+});
+</script>
 {% endblock %}

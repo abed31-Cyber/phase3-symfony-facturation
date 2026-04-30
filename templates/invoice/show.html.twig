@@ -1,53 +1,122 @@
-{% extends 'base.html.twig' %}
+{% extends 'layout.html.twig' %}
+{% block title %}Facture {{ invoice.number }}{% endblock %}
 
-{% block title %}Invoice{% endblock %}
+{% block content %}
+<a href="{{ path('app_invoice_index') }}" class="page-back">← Retour aux factures</a>
 
-{% block body %}
-    <h1>Invoice</h1>
+{# ===== Header avec statut et actions ===== #}
+<div class="invoice-page-header">
+    <div class="invoice-page-title">
+        <h1>Facture {{ invoice.number }}</h1>
+        {% if invoice.status == 'DRAFT' %}
+            <span class="badge badge-draft">⏱ Brouillon</span>
+        {% elseif invoice.status == 'PENDING' %}
+            <span class="badge badge-pending">⏰ En attente</span>
+        {% elseif invoice.status == 'PAID' %}
+            <span class="badge badge-paid">✓ Payée</span>
+        {% else %}
+            <span class="badge badge-cancelled">✕ Annulée</span>
+        {% endif %}
+    </div>
+    <div class="invoice-page-actions">
+        {% if invoice.status == 'DRAFT' %}
+            <form method="post" action="{{ path('app_invoice_validate', {id: invoice.id}) }}" style="display:inline;">
+                <input type="hidden" name="_token" value="{{ csrf_token('validate-' ~ invoice.id) }}">
+                <button type="submit" class="btn btn-success">✓ Valider la facture</button>
+            </form>
+            <form method="post" action="{{ path('app_invoice_delete', {id: invoice.id}) }}"
+                  onsubmit="return confirm('Supprimer ?')" style="display:inline;">
+                <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ invoice.id) }}">
+                <button type="submit" class="btn btn-danger">🗑 Supprimer</button>
+            </form>
+        {% elseif invoice.status == 'PENDING' %}
+            <a href="#" class="btn btn-secondary">📄 PDF</a>
+            <a href="#" class="btn btn-secondary">✉ Envoyer</a>
+            <form method="post" action="{{ path('app_invoice_pay', {id: invoice.id}) }}" style="display:inline;">
+                <input type="hidden" name="_token" value="{{ csrf_token('pay-' ~ invoice.id) }}">
+                <button type="submit" class="btn btn-success">€ Valider le paiement</button>
+            </form>
+        {% elseif invoice.status == 'PAID' %}
+            <a href="#" class="btn btn-secondary">📄 PDF</a>
+        {% endif %}
+    </div>
+</div>
 
-    <table class="table">
+<p class="text-muted mb-4" style="font-size:13px;">Date : {{ invoice.createdAt|date('d/m/Y') }}</p>
+
+{# ===== Invoice Preview ===== #}
+<div class="invoice-preview">
+    <div class="invoice-header-row">
+        <div>
+            <div class="invoice-from-name">{{ invoice.owner.compagnyName }}</div>
+            <div class="invoice-from-info">{{ invoice.owner.firstName }} {{ invoice.owner.lastName }}</div>
+            <div class="invoice-from-info">{{ invoice.owner.email }}</div>
+        </div>
+        <div class="invoice-title-block">
+            <h2>FACTURE</h2>
+            <p>N° {{ invoice.number }}<br>Date : {{ invoice.createdAt|date('d/m/Y') }}</p>
+        </div>
+    </div>
+
+    {% if invoice.client %}
+    <div class="invoice-to-block">
+        <div class="invoice-to-label">FACTURÉ À</div>
+        <div class="invoice-to-name">{{ invoice.client.compagnyName ?: (invoice.client.name ~ ' ' ~ invoice.client.lastName) }}</div>
+        <div class="invoice-to-info">
+            {{ invoice.client.adress }}, {{ invoice.client.codePostal }} {{ invoice.client.ville }}<br>
+            {{ invoice.client.email }}<br>
+            {% if invoice.client.compagnyName %}SIRET : {{ invoice.client.compagnyName }}{% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <table class="invoice-items-table">
+        <thead>
+            <tr>
+                <th style="width:50%">Description</th>
+                <th>Qté</th>
+                <th>Prix Unitaire</th>
+                <th>Total TTC</th>
+            </tr>
+        </thead>
         <tbody>
+        {% for item in invoice.invoiceItems %}
             <tr>
-                <th>Id</th>
-                <td>{{ invoice.id }}</td>
-            </tr>
-            <tr>
-                <th>Number</th>
-                <td>{{ invoice.number }}</td>
-            </tr>
-            <tr>
-                <th>Owner</th>
                 <td>
-                    {% if invoice.owner %}
-                        {% set ownerName = (invoice.owner.firstName is not empty or invoice.owner.lastName is not empty) ? (invoice.owner.firstName|default('') ~ ' ' ~ invoice.owner.lastName|default('')) : (invoice.owner.compagnyName ?: invoice.owner.email) %}
-                        {{ ownerName|trim }}
-                    {% else %}
-                        {{ '' }}
-                    {% endif %}
+                    <div class="invoice-item-name">{{ item.description }}</div>
                 </td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.unitPrice|number_format(2, ',', ' ') }} €</td>
+                <td class="fw-semibold">{{ item.subTotalHt|number_format(2, ',', ' ') }} €</td>
             </tr>
-            <tr>
-                <th>CreatedAt</th>
-                <td>{{ invoice.createdAt ? invoice.createdAt|date('Y-m-d H:i:s') : '' }}</td>
-            </tr>
-            <tr>
-                <th>Due_date</th>
-                <td>{{ invoice.dueDate ? invoice.dueDate|date('Y-m-d H:i:s') : '' }}</td>
-            </tr>
-            <tr>
-                <th>Total_ht</th>
-                <td>{{ invoice.totalHt }}</td>
-            </tr>
-            <tr>
-                <th>Total_ttc</th>
-                <td>{{ invoice.totalTtc }}</td>
-            </tr>
+        {% endfor %}
         </tbody>
     </table>
 
-    <a href="{{ path('app_invoice_index') }}">back to list</a>
+    <div class="invoice-totals">
+        <div class="invoice-totals-row">
+            <span>Total HT</span>
+            <span>{{ invoice.totalHt|number_format(2, ',', ' ') }} €</span>
+        </div>
+        <div class="invoice-totals-row total">
+            <span>Total TTC</span>
+            <span>{{ invoice.totalTtc|number_format(2, ',', ' ') }} €</span>
+        </div>
+    </div>
+    <p class="invoice-tva-note">TVA non applicable, art. 293 B du CGI</p>
 
-    <a href="{{ path('app_invoice_edit', {'id': invoice.id}) }}">edit</a>
+    {% if invoice.owner.iban %}
+    <div class="invoice-footer">
+        <strong>Coordonnées bancaires pour le paiement :</strong><br>
+        {{ invoice.owner.iban }}
+    </div>
+    {% endif %}
 
-    {{ include('invoice/_delete_form.html.twig') }}
+    {% if invoice.owner.cgv %}
+    <div class="invoice-footer">
+        <strong>Conditions de paiement</strong><br>
+        {{ invoice.owner.cgv|nl2br }}
+    </div>
+    {% endif %}
+</div>
 {% endblock %}
